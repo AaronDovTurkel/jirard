@@ -1,0 +1,17 @@
+[package]
+name = "jirard"
+version = "0.1.0"
+authors = ["Aaron Turkel <aturkel@fabuwood.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+tokio = { version = "1", features = ["full"] }
+serde = "1.0.125"
+serde_json = "1.0.64"
+serde_derive = "1.0.125"
+error-chain = "0.12.4"
+regex = "0.2"
