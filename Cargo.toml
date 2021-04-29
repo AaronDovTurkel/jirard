@@ -3,6 +3,8 @@ name = "jirard"
 version = "0.1.0"
 authors = ["Aaron Turkel <aarondovturkel@gmail.com>"]
 edition = "2018"
+description = "Your personal Jira butler; an easy to use Jira CLI."
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
