@@ -1,46 +1,108 @@
-// use regex::{NoExpand, Regex};
-// use reqwest::blocking::Client;
-// use serde_json::{json, Map, Value};
+use dialoguer::Password;
+use regex::Regex;
+use reqwest;
+use serde_json::{json, Map, Value};
 use std::env;
+use std::io;
 use std::process::Command;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt, PartialEq)]
+#[structopt(
+    name = "Jirard",
+    about = "Your personal Jira butler. An easy to use Jira CLI."
+)]
+struct Opt {
+    /// Provide the Jira issue key for issue actions
+    #[structopt(short, long, default_value)]
+    issue: String,
+
+    /// Comment to be added to jira issue provided
+    #[structopt(short, long, default_value)]
+    comment: String,
+}
+
+#[derive(Debug)]
+struct JiraClient {
+    user: String,
+    pass: String,
+    api: String,
+}
+
+impl JiraClient {
+    fn comment(
+        &self,
+        issue: String,
+        comment: String,
+    ) -> Result<Map<String, Value>, reqwest::Error> {
+        let comment_body = json!({
+            "body": comment,
+            "visibility":  {}
+        });
+
+        let request_url = format!("{}/issue/{}/comment", self.api, issue,);
+        reqwest::blocking::Client::new()
+            .post(request_url)
+            .basic_auth(&self.user, Some(&self.pass))
+            .json(&comment_body)
+            .send()?
+            .json::<Map<String, Value>>()
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let jira_user = env::var("JIRA_USER")?;
-    // let jira_pass = env::var("JIRA_PASS")?;
+    let opt = Opt::from_args();
 
-    // println!("user: {}, pass: {}", jira_user, jira_pass);
+    let client = JiraClient {
+        user: get_env_prompt("JIRA_USER")
+            .expect("Could not parse Jira username")
+            .to_string(),
+        pass: get_env_prompt("JIRA_PASS")
+            .expect("Could not parse Jira password")
+            .to_string(),
+        api: get_env_prompt("JIRA_API")
+            .expect("Could not parse Jira api")
+            .to_string(),
+    };
 
-    let branch_name = Command::new("git")
-        .arg("branch")
-        .output()
-        .expect("ls command failed to start");
-
-    String::from_utf8(branch_name.stdout)?.lines().for_each(|x| println!("{:#?}", x));
-    
-    
-
-    // let comment_body = json!({
-    //     "body": "This is a test comment",
-    //     "visibility":  {}
-    // });
-
-    // let request_url = format!(
-    //     "https://jira.fabuwood.com/rest/api/2/issue/{}/comment",
-    //     String::from("TESLA-3425"),
-    // );
-    // let response = Client::new()
-    //     .post(request_url)
-    //     .basic_auth(jira_user.clone(), Some(jira_pass.clone()))
-    //     .json(&comment_body)
-    //     .send()?
-    //     .json::<Map<String, Value>>()?;
-
-    // println!("Added Comment {:#?}", response);
+    if opt.comment.len() > 0 {
+        let issue = if opt.issue.len() > 0 {
+            opt.issue
+        } else {
+            parse_jira_issue()?
+        };
+        client.comment(issue, opt.comment)?;
+    };
 
     Ok(())
 }
 
-// fn parse_jira_issue(branch_name: &str) -> Vec<&str> {
-//     let re = Regex::new("([A-Z][A-Z0-9]+-[0-9]+)").unwrap();
-//     re.split(branch_name).collect()
-// }
+fn parse_jira_issue() -> Result<String, Box<dyn std::error::Error>> {
+    let pattern = Regex::new("([A-Z][A-Z0-9]+-[0-9]+)")?;
+
+    let branch_name = String::from_utf8(
+        Command::new("git")
+            .arg("branch")
+            .output()
+            .expect("git command failed to start")
+            .stdout,
+    )?;
+
+    let issue_key = pattern
+        .captures(&branch_name)
+        .unwrap()
+        .get(1)
+        .map_or("", |m| m.as_str());
+
+    Ok(String::from(&*issue_key))
+}
+
+fn get_env_prompt(var: &str) -> io::Result<String> {
+    if let Ok(value) = env::var(var) {
+        Ok(value)
+    } else {
+        let value: String = Password::new().with_prompt(var).interact()?;
+        env::set_var(var, &value);
+        Ok(value.to_string())
+    }
+}
