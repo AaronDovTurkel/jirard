@@ -1,4 +1,4 @@
-use dialoguer::Password;
+use dialoguer::Input;
 use regex::Regex;
 use reqwest;
 use serde_json::{json, Map, Value};
@@ -65,11 +65,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .to_string(),
     };
 
+    println!("{:#?}", client);
+
     if opt.comment.len() > 0 {
         let issue = if opt.issue.len() > 0 {
             opt.issue
         } else {
-            parse_jira_issue()?
+            parse_jira_issue().expect("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")
         };
         client.comment(issue, opt.comment)?;
     };
@@ -83,16 +85,15 @@ fn parse_jira_issue() -> Result<String, Box<dyn std::error::Error>> {
     let branch_name = String::from_utf8(
         Command::new("git")
             .arg("branch")
+            .arg("--show-current")
             .output()
             .expect("git command failed to start")
             .stdout,
     )?;
 
-    let issue_key = pattern
-        .captures(&branch_name)
-        .unwrap()
-        .get(1)
-        .map_or("", |m| m.as_str());
+    let capture = pattern.captures(&branch_name)?;
+
+    let issue_key = capture.get(1).map_or("", |m| m.as_str());
 
     Ok(String::from(&*issue_key))
 }
@@ -101,8 +102,6 @@ fn get_env_prompt(var: &str) -> io::Result<String> {
     if let Ok(value) = env::var(var) {
         Ok(value)
     } else {
-        let value: String = Password::new().with_prompt(var).interact()?;
-        env::set_var(var, &value);
-        Ok(value.to_string())
+        Ok(Input::new().with_prompt(var).interact()?)
     }
 }
