@@ -2,9 +2,7 @@ use dialoguer::Input;
 use regex::Regex;
 use reqwest;
 use serde_json::{json, Map, Value};
-use std::env;
-use std::io;
-use std::process::Command;
+use std::{env, io, process::Command};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt, PartialEq)]
@@ -71,7 +69,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let issue = if opt.issue.len() > 0 {
             opt.issue
         } else {
-            parse_jira_issue().expect("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")
+            let branch_name = String::from_utf8(
+                Command::new("git")
+                    .arg("branch")
+                    .arg("--show-current")
+                    .output()
+                    .expect("git command failed to start")
+                    .stdout,
+            )?;
+            parse_jira_issue(branch_name).expect("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")
         };
         client.comment(issue, opt.comment)?;
     };
@@ -79,22 +85,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn parse_jira_issue() -> Result<String, Box<dyn std::error::Error>> {
+fn parse_jira_issue(branch_name: String) -> Result<String, Box<dyn std::error::Error>> {
     let pattern = Regex::new("([A-Z][A-Z0-9]+-[0-9]+)")?;
-
-    let branch_name = String::from_utf8(
-        Command::new("git")
-            .arg("branch")
-            .arg("--show-current")
-            .output()
-            .expect("git command failed to start")
-            .stdout,
-    )?;
-
-    let capture = pattern.captures(&branch_name)?;
-
-    let issue_key = capture.get(1).map_or("", |m| m.as_str());
-
+    let issue_key = pattern.captures(&branch_name).ok_or("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")?.get(1).map_or("", |m| m.as_str());
     Ok(String::from(&*issue_key))
 }
 
