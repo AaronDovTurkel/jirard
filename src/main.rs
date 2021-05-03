@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("git command failed to start")
                     .stdout,
             )?;
-            parse_jira_issue(branch_name).expect("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")
+            parse_jira_issue(branch_name).expect("Please provide issue key in arguments.")
         };
         client.comment(issue, opt.comment)?;
     };
@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn parse_jira_issue(branch_name: String) -> Result<String, Box<dyn std::error::Error>> {
     let pattern = Regex::new("([A-Z][A-Z0-9]+-[0-9]+)")?;
-    let issue_key = pattern.captures(&branch_name).ok_or("Could not parse Jira issue key from branch name. Please provide issue key in arguments.")?.get(1).map_or("", |m| m.as_str());
+    let issue_key = pattern.captures(&branch_name).ok_or("Could not parse Jira issue key from branch name")?.get(1).map_or("", |m| m.as_str());
     Ok(String::from(&*issue_key))
 }
 
